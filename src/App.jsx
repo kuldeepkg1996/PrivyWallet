@@ -50,29 +50,37 @@ function App() {
     const sendWalletToNative = (address) => {
       setWalletAddress(address);
 
-      // 1) Main path for InAppBrowser: deep link
-      try {
-        console.log('Redirecting to deep link with address:', address);
-        // orbitxpay is your custom scheme. Make sure it matches native config.
-        window.location.href = `orbitxpay://walletscreen?address=${encodeURIComponent(
-          address,
-        )}`;
-      } catch (e) {
-        console.error('Failed to redirect to deep link:', e);
-      }
+      const delayMs = 3000; // wait 3 seconds before redirect/post
 
-      // 2) Fallback: if running inside a React Native WebView
+      console.log(`Will redirect/post wallet address in ${delayMs}ms`, address);
+
       setTimeout(() => {
-        if ((window ).ReactNativeWebView) {
-          console.log('Posting wallet address to ReactNativeWebView');
-          (window).ReactNativeWebView.postMessage(
-            JSON.stringify({
-              type: 'WALLET_ADDRESS',
-              address,
-            }),
-          );
+        // 1) Main path for InAppBrowser: deep link
+        try {
+          console.log('Redirecting to deep link with address:', address);
+          // orbitxpay is your custom scheme. Make sure it matches native config.
+          window.location.href = `orbitxpay://walletscreen?address=${encodeURIComponent(
+            address,
+          )}`;
+        } catch (e) {
+          console.error('Failed to redirect to deep link:', e);
         }
-      }, 500);
+
+        // 2) Fallback: if running inside a React Native WebView
+        try {
+          if (window?.ReactNativeWebView) {
+            console.log('Posting wallet address to ReactNativeWebView');
+            window.ReactNativeWebView.postMessage(
+              JSON.stringify({
+                type: 'WALLET_ADDRESS',
+                address,
+              }),
+            );
+          }
+        } catch (e) {
+          console.error('Failed to post to ReactNativeWebView:', e);
+        }
+      }, delayMs);
     };
 
     if (walletsReady && wallets.length > 0) {
