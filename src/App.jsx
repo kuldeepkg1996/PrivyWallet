@@ -50,7 +50,7 @@ function App() {
     const sendWalletToNative = (address) => {
       setWalletAddress(address);
 
-      const delayMs = 3000; // wait 3 seconds before redirect/post
+      const delayMs = 5000; // wait 3 seconds before redirect/post
 
       console.log(`Will redirect/post wallet address in ${delayMs}ms`, address);
 
