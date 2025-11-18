@@ -54,7 +54,7 @@ function App() {
       try {
         console.log('Redirecting to deep link with address:', address);
         // orbitxpay is your custom scheme. Make sure it matches native config.
-        window.location.href = `orbitxpay://wallet?address=${encodeURIComponent(
+        window.location.href = `orbitxpay://walletscreen?address=${encodeURIComponent(
           address,
         )}`;
       } catch (e) {
