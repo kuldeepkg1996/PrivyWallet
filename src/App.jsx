@@ -1,162 +1,199 @@
-import { useState, useEffect } from 'react'
-import { 
-  usePrivy, 
-  useWallets, 
+// App.tsx or App.jsx
+import { useState, useEffect } from 'react';
+import {
+  usePrivy,
+  useWallets,
   useCreateWallet,
   useSignupWithPasskey,
-  useLoginWithPasskey 
-} from '@privy-io/react-auth'
-import './App.css'
+  useLoginWithPasskey,
+} from '@privy-io/react-auth';
+import './App.css';
 
 function App() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [walletAddress, setWalletAddress] = useState('')
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [walletAddress, setWalletAddress] = useState('');
 
-  const { authenticated, user, logout, ready: privyReady } = usePrivy()
-  const { wallets, ready: walletsReady } = useWallets()
-  const { createWallet } = useCreateWallet()
-  
+  const { authenticated, logout, ready: privyReady } = usePrivy();
+  const { wallets, ready: walletsReady } = useWallets();
+  const { createWallet } = useCreateWallet();
+
   const { signupWithPasskey } = useSignupWithPasskey({
     onComplete: async (user) => {
-      console.log('User signed up:', user)
+      console.log('User signed up:', user);
       // Automatically create wallet after signup
       try {
-        await createWallet()
+        await createWallet();
       } catch (error) {
-        console.error('Failed to create wallet:', error)
-        setError('Failed to create wallet after signup')
+        console.error('Failed to create wallet:', error);
+        setError('Failed to create wallet after signup');
       }
     },
     onError: (error) => {
-      console.error('Signup failed:', error)
-      setError('Failed to sign up with passkey')
-    }
-  })
-  
+      console.error('Signup failed:', error);
+      setError('Failed to sign up with passkey');
+    },
+  });
+
   const { loginWithPasskey } = useLoginWithPasskey({
     onComplete: (user) => {
-      console.log('User logged in:', user)
+      console.log('User logged in:', user);
     },
     onError: (error) => {
-      console.error('Login failed:', error)
-      setError('Failed to login with passkey')
-    }
-  })
+      console.error('Login failed:', error);
+      setError('Failed to login with passkey');
+    },
+  });
 
   // Extract wallet address when wallets are ready
   useEffect(() => {
-    if (walletsReady && wallets.length > 0) {
-      const address = wallets[0].address
-      setWalletAddress(address)
-      
-      // Post message to React Native WebView if available
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'WALLET_ADDRESS',
-          address: address
-        }))
+    const sendWalletToNative = (address) => {
+      setWalletAddress(address);
+
+      // 1) Main path for InAppBrowser: deep link
+      try {
+        console.log('Redirecting to deep link with address:', address);
+        // orbitxpay is your custom scheme. Make sure it matches native config.
+        window.location.href = `orbitxpay://wallet?address=${encodeURIComponent(
+          address,
+        )}`;
+      } catch (e) {
+        console.error('Failed to redirect to deep link:', e);
       }
+
+      // 2) Fallback: if running inside a React Native WebView
+      setTimeout(() => {
+        if ((window ).ReactNativeWebView) {
+          console.log('Posting wallet address to ReactNativeWebView');
+          (window).ReactNativeWebView.postMessage(
+            JSON.stringify({
+              type: 'WALLET_ADDRESS',
+              address,
+            }),
+          );
+        }
+      }, 500);
+    };
+
+    if (walletsReady && wallets.length > 0) {
+      const address = wallets[0].address;
+      console.log('Wallets ready, address:', address);
+      sendWalletToNative(address);
     } else if (walletsReady && wallets.length === 0 && authenticated) {
       // User is authenticated but has no wallet, create one
+      console.log('Authenticated but no wallets. Creating wallet...');
       const createWalletAsync = async () => {
-        setLoading(true)
-        setError('')
+        setLoading(true);
+        setError('');
         try {
-          await createWallet()
+          await createWallet();
         } catch (err) {
-          setError(err.message || 'Failed to create wallet')
+          console.error('Error creating wallet:', err);
+          setError(err?.message || 'Failed to create wallet');
         } finally {
-          setLoading(false)
+          setLoading(false);
         }
-      }
-      createWalletAsync()
+      };
+      createWalletAsync();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletsReady, wallets, authenticated])
+  }, [walletsReady, wallets, authenticated]);
 
   const handleSignup = async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
     try {
-      await signupWithPasskey()
+      await signupWithPasskey();
     } catch (err) {
-      setError(err.message || 'Signup failed')
+      console.error('Signup error:', err);
+      setError(err?.message || 'Signup failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleLogin = async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
     try {
-      await loginWithPasskey()
+      await loginWithPasskey();
     } catch (err) {
-      setError(err.message || 'Login failed')
+      console.error('Login error:', err);
+      setError(err?.message || 'Login failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleCreateWallet = async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
     try {
-      await createWallet()
+      await createWallet();
     } catch (err) {
-      setError(err.message || 'Failed to create wallet')
+      console.error('Create wallet error:', err);
+      setError(err?.message || 'Failed to create wallet');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleLogout = async () => {
-    setLoading(true)
+    setLoading(true);
+    setError('');
     try {
-      await logout()
-      setWalletAddress('')
+      await logout();
+      setWalletAddress('');
     } catch (err) {
-      setError(err.message || 'Logout failed')
+      console.error('Logout error:', err);
+      setError(err?.message || 'Logout failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const copyToClipboard = async (text) => {
     try {
-      await navigator.clipboard.writeText(text)
-      alert('Address copied to clipboard!')
+      await navigator.clipboard.writeText(text);
+      alert('Address copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err)
+      console.error('Failed to copy:', err);
     }
-  }
+  };
 
   // Loading state - show loading for max 10 seconds, then show error
-  const [initTimeout, setInitTimeout] = useState(false)
-  
+  const [initTimeout, setInitTimeout] = useState(false);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!walletsReady && !privyReady) {
-        setInitTimeout(true)
+        setInitTimeout(true);
       }
-    }, 10000)
-    return () => clearTimeout(timer)
-  }, [walletsReady, privyReady])
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [walletsReady, privyReady]);
 
   // Show loading if Privy or wallets aren't ready
   if ((!walletsReady || !privyReady) && !initTimeout) {
     return (
       <div className="app-container">
         <div className="loading-container">
-          <div className="spinner"></div>
+          <div className="spinner" />
           <p>Initializing Privy...</p>
-          <p style={{ fontSize: '0.875rem', marginTop: '10px', opacity: 0.8 }}>
-            Privy Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready: {walletsReady ? 'Yes' : 'No'}
+          <p
+            style={{
+              fontSize: '0.875rem',
+              marginTop: '10px',
+              opacity: 0.8,
+            }}
+          >
+            Privy Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
+            {walletsReady ? 'Yes' : 'No'}
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   if (initTimeout && (!walletsReady || !privyReady)) {
@@ -165,12 +202,20 @@ function App() {
         <div className="auth-container">
           <div className="auth-card">
             <h1 className="app-title">⚠️ Initialization Error</h1>
-            <p className="app-subtitle">Privy is taking longer than expected to initialize.</p>
-            <p className="info-text">Please refresh the page or check your Privy App ID configuration.</p>
-            <p className="info-text" style={{ fontSize: '0.75rem', marginTop: '10px' }}>
-              Privy Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready: {walletsReady ? 'Yes' : 'No'}
+            <p className="app-subtitle">
+              Privy is taking longer than expected to initialize.
             </p>
-            <button 
+            <p className="info-text">
+              Please refresh the page or check your Privy App ID configuration.
+            </p>
+            <p
+              className="info-text"
+              style={{ fontSize: '0.75rem', marginTop: '10px' }}
+            >
+              Privy Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
+              {walletsReady ? 'Yes' : 'No'}
+            </p>
+            <button
               className="btn btn-primary"
               onClick={() => window.location.reload()}
             >
@@ -179,7 +224,7 @@ function App() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Not authenticated - show login/signup
@@ -189,20 +234,19 @@ function App() {
         <div className="auth-container">
           <div className="auth-card">
             <h1 className="app-title">🔐 Privy Wallet</h1>
-            <p className="app-subtitle">Secure Web3 Authentication with Passkeys</p>
-            
+            <p className="app-subtitle">
+              Secure Web3 Authentication with Passkeys
+            </p>
             {error && <div className="error-message">{error}</div>}
-            
             <div className="auth-buttons">
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleSignup}
                 disabled={loading}
               >
                 {loading ? 'Signing up...' : 'Sign Up with Passkey'}
               </button>
-              
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={handleLogin}
                 disabled={loading}
@@ -210,14 +254,13 @@ function App() {
                 {loading ? 'Logging in...' : 'Login with Passkey'}
               </button>
             </div>
-            
             <p className="info-text">
               Passkeys provide passwordless, phishing-resistant authentication
             </p>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Authenticated - show wallet info
@@ -227,7 +270,7 @@ function App() {
         <div className="wallet-card">
           <div className="wallet-header">
             <h1 className="wallet-title">✨ Your Wallet</h1>
-            <button 
+            <button
               className="btn-logout"
               onClick={handleLogout}
               disabled={loading}
@@ -244,7 +287,7 @@ function App() {
                 <label className="address-label">Wallet Address</label>
                 <div className="address-container">
                   <code className="address-text">{walletAddress}</code>
-                  <button 
+                  <button
                     className="btn-copy"
                     onClick={() => copyToClipboard(walletAddress)}
                     title="Copy address"
@@ -268,12 +311,12 @@ function App() {
           ) : (
             <div className="no-wallet">
               <p>No wallet found. Creating one for you...</p>
-              {loading && <div className="spinner-small"></div>}
+              {loading && <div className="spinner-small" />}
             </div>
           )}
 
           {!walletAddress && !loading && (
-            <button 
+            <button
               className="btn btn-primary"
               onClick={handleCreateWallet}
               disabled={loading}
@@ -284,7 +327,7 @@ function App() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
