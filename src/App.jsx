@@ -1,31 +1,78 @@
-// App.tsx or App.jsx
+// App.jsx
 import { useState, useEffect } from 'react';
 import {
   usePrivy,
-  useWallets,
-  useCreateWallet,
+  useWallets as useEvmWallets,
+  useCreateWallet as useCreateEvmWallet,
   useSignupWithPasskey,
   useLoginWithPasskey,
 } from '@privy-io/react-auth';
+
+import {
+  useWallets as useSolanaWallets,
+  useCreateWallet as useCreateSolanaWallet,
+} from '@privy-io/react-auth/solana';
+
 import './App.css';
 
 function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [initTimeout, setInitTimeout] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   const { authenticated, logout, ready: privyReady } = usePrivy();
-  const { wallets, ready: walletsReady } = useWallets();
-  const { createWallet } = useCreateWallet();
+
+  // EVM wallets
+  const {
+    wallets: evmWallets,
+    ready: evmWalletsReady,
+  } = useEvmWallets();
+
+  const { createWallet: createEvmWallet } = useCreateEvmWallet();
+
+  // Solana wallets
+  const {
+    wallets: solanaWallets,
+    ready: solanaWalletsReady,
+  } = useSolanaWallets();
+
+  const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
+
+  const allWalletsReady = evmWalletsReady && solanaWalletsReady;
 
   const { signupWithPasskey } = useSignupWithPasskey({
     onComplete: async (user) => {
       console.log('User signed up:', user);
-      // Automatically create wallet after signup
+      // Automatically create EVM + Solana wallets after signup
       try {
-        await createWallet();
+        console.log('🔄 Creating EVM + Solana wallets after signup...');
+        const [evmResult, solResult] = await Promise.all([
+          createEvmWallet(),
+          createSolanaWallet(),
+        ]);
+
+        console.log('✅ EVM wallet created after signup:', evmResult);
+        console.log('✅ Solana wallet created after signup:', solResult);
+
+        console.log('📝 EVM wallet details:', {
+          address: evmResult?.address,
+          chainId: evmResult?.chainId,
+          chainIdNumber: evmResult?.chainIdNumber,
+          walletType: evmResult?.walletType,
+          walletClientType: evmResult?.walletClientType,
+          chainType: evmResult?.chainType,
+        });
+
+        console.log('📝 Solana wallet details:', {
+          address: solResult?.address,
+          chainType: solResult?.chainType,
+          walletType: solResult?.walletType,
+          walletClientType: solResult?.walletClientType,
+        });
       } catch (error) {
-        console.error('Failed to create wallet:', error);
-        setError('Failed to create wallet after signup');
+        console.error('❌ Failed to create wallets after signup:', error);
+        setError('Failed to create wallets after signup');
       }
     },
     onError: (error) => {
@@ -44,67 +91,124 @@ function App() {
     },
   });
 
-  // Extract wallet address when wallets are ready
-  useEffect(() => {
-    const sendWalletToNative = (address) => {
-      // Clear any errors before redirecting
-      setError('');
-      
-      // Redirect immediately without delay
-      console.log('Redirecting to mobile app with address:', address);
+  /**
+   * Send both EVM + Solana addresses to native
+   */
+  const sendWalletsToNative = (evmAddress, solanaAddress) => {
+    // Prevent multiple redirects
+    if (hasRedirected) return;
+    
+    // Clear any errors before redirecting
+    setError('');
+    setHasRedirected(true);
 
-      // 1) Main path for InAppBrowser: deep link
-      try {
-        console.log('Redirecting to deep link with address:', address);
-        // orbitxpay is your custom scheme. Make sure it matches native config.
-        window.location.href = `orbitxpay://walletscreen?address=${encodeURIComponent(
-          address,
-        )}`;
-      } catch (e) {
-        console.error('Failed to redirect to deep link:', e);
+    const payload = {
+      evmAddress: evmAddress || null,
+      solanaAddress: solanaAddress || null,
+    };
+
+    console.log('Redirecting to mobile app with payload:', payload);
+
+    // 1) Main path for InAppBrowser: deep link with both addresses
+    try {
+      const encodedPayload = encodeURIComponent(JSON.stringify(payload));
+      const url = `orbitxpay://walletscreen?payload=${encodedPayload}`;
+      console.log('Redirecting to deep link:', url);
+      window.location.href = url;
+    } catch (e) {
+      console.error('Failed to redirect to deep link:', e);
+    }
+
+    // 2) Fallback: if running inside a React Native WebView
+    try {
+      if (window.ReactNativeWebView) {
+        console.log('Posting wallet addresses to ReactNativeWebView');
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: 'WALLET_ADDRESS', // legacy type
+            address: evmAddress, // legacy field
+            evmAddress,
+            solanaAddress,
+          }),
+        );
       }
+    } catch (e) {
+      console.error('Failed to post to ReactNativeWebView:', e);
+    }
+  };
 
-      // 2) Fallback: if running inside a React Native WebView
+  /**
+   * Ensure both EVM + Solana wallets exist, then send to native
+   */
+  useEffect(() => {
+    if (!authenticated) return;
+    if (!allWalletsReady) return;
+    if (loading) return; // avoid double-create loops
+
+    const evmWallet = evmWallets[0];
+    const solWallet = solanaWallets[0];
+
+    // If both exist, just send addresses to native
+    if (evmWallet && solWallet) {
+      console.log('✅ EVM and Solana wallets ready!');
+      console.log('📍 EVM address:', evmWallet.address);
+      console.log('📍 Solana address:', solWallet.address);
+      sendWalletsToNative(evmWallet.address, solWallet.address);
+      return;
+    }
+
+    // If any is missing, create missing wallets
+    const createMissingWallets = async () => {
+      setError('');
+      setLoading(true);
       try {
-        if (window?.ReactNativeWebView) {
-          console.log('Posting wallet address to ReactNativeWebView');
-          window.ReactNativeWebView.postMessage(
-            JSON.stringify({
-              type: 'WALLET_ADDRESS',
-              address,
-            }),
+        if (!evmWallet) {
+          console.log(
+            '🔐 Authenticated but no EVM wallets found. Creating EVM wallet...',
           );
+          const res = await createEvmWallet();
+          console.log('✅ EVM wallet created:', res);
         }
-      } catch (e) {
-        console.error('Failed to post to ReactNativeWebView:', e);
+
+        if (!solWallet) {
+          console.log(
+            '🔐 Authenticated but no Solana wallets found. Creating Solana wallet...',
+          );
+          const res = await createSolanaWallet();
+          console.log('✅ Solana wallet created:', res);
+        }
+      } catch (err) {
+        console.error('❌ Error creating wallet(s):', err);
+        setError(err?.message || 'Failed to create wallet(s)');
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (walletsReady && wallets.length > 0) {
-      const address = wallets[0].address;
-      console.log('Wallets ready, address:', address);
-      // Clear error before redirecting
-      setError('');
-      sendWalletToNative(address);
-    } else if (walletsReady && wallets.length === 0 && authenticated) {
-      // User is authenticated but has no wallet, create one
-      console.log('Authenticated but no wallets. Creating wallet...');
-      const createWalletAsync = async () => {
-        setLoading(true);
-        setError('');
-        try {
-          await createWallet();
-        } catch (err) {
-          console.error('Error creating wallet:', err);
-          setError(err?.message || 'Failed to create wallet');
-        } finally {
-          setLoading(false);
-        }
-      };
-      createWalletAsync();
-    }
+    createMissingWallets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletsReady, wallets, authenticated]);
+  }, [
+    authenticated,
+    allWalletsReady,
+    evmWallets,
+    solanaWallets,
+    createEvmWallet,
+    createSolanaWallet,
+    loading,
+  ]);
+
+  /**
+   * Loading timeout (10s)
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!allWalletsReady && !privyReady) {
+        setInitTimeout(true);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [allWalletsReady, privyReady]);
 
   const handleSignup = async () => {
     setLoading(true);
@@ -132,56 +236,9 @@ function App() {
     }
   };
 
-  const handleCreateWallet = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await createWallet();
-    } catch (err) {
-      console.error('Create wallet error:', err);
-      setError(err?.message || 'Failed to create wallet');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await logout();
-    } catch (err) {
-      console.error('Logout error:', err);
-      setError(err?.message || 'Logout failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('Address copied to clipboard!');
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  // Loading state - show loading for max 10 seconds, then show error
-  const [initTimeout, setInitTimeout] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!walletsReady && !privyReady) {
-        setInitTimeout(true);
-      }
-    }, 10000);
-
-    return () => clearTimeout(timer);
-  }, [walletsReady, privyReady]);
 
   // Show loading if system or wallets aren't ready
-  if ((!walletsReady || !privyReady) && !initTimeout) {
+  if ((!allWalletsReady || !privyReady) && !initTimeout) {
     return (
       <div className="app-container">
         <div className="loading-container">
@@ -194,15 +251,16 @@ function App() {
               opacity: 0.8,
             }}
           >
-            System Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
-            {walletsReady ? 'Yes' : 'No'}
+            System Ready: {privyReady ? 'Yes' : 'No'} | EVM Wallets Ready:{' '}
+            {evmWalletsReady ? 'Yes' : 'No'} | Solana Wallets Ready:{' '}
+            {solanaWalletsReady ? 'Yes' : 'No'}
           </p>
         </div>
       </div>
     );
   }
 
-  if (initTimeout && (!walletsReady || !privyReady)) {
+  if (initTimeout && (!allWalletsReady || !privyReady)) {
     return (
       <div className="app-container">
         <div className="auth-container">
@@ -218,8 +276,9 @@ function App() {
               className="info-text"
               style={{ fontSize: '0.75rem', marginTop: '10px' }}
             >
-              System Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
-              {walletsReady ? 'Yes' : 'No'}
+              System Ready: {privyReady ? 'Yes' : 'No'} | EVM Wallets Ready:{' '}
+              {evmWalletsReady ? 'Yes' : 'No'} | Solana Wallets Ready:{' '}
+              {solanaWalletsReady ? 'Yes' : 'No'}
             </p>
             <button
               className="btn btn-primary"
@@ -241,7 +300,8 @@ function App() {
           <div className="auth-card">
             <h1 className="app-title">🔐 Create Your Self-Custodial Wallet</h1>
             <p className="app-subtitle">
-              Secure Web3 Authentication with Passkeys and generate your self-custodial wallet
+              Secure Web3 Authentication with Passkeys and generate your EVM +
+              Solana self-custodial wallets
             </p>
             {error && <div className="error-message">{error}</div>}
             <div className="auth-buttons">
@@ -269,41 +329,21 @@ function App() {
     );
   }
 
-  // Authenticated - show wallet info
+  // Authenticated - automatically redirect when wallets are ready
+  const primaryEvm = evmWallets[0];
+  const primarySol = solanaWallets[0];
+
+  // Show loading/redirecting message while wallets are being created or redirecting
   return (
     <div className="app-container">
-      <div className="wallet-container">
-        <div className="wallet-card">
-          <div className="wallet-header">
-            <h1 className="wallet-title">✨ Your Wallet</h1>
-            {/* <button
-              className="btn-logout"
-              onClick={handleLogout}
-              disabled={loading}
-            >
-              Logout
-            </button> */}
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          {wallets.length === 0 && (
-            <div className="no-wallet">
-              <p>No wallet found. Creating one for you...</p>
-              {loading && <div className="spinner-small" />}
-            </div>
-          )}
-
-          {wallets.length === 0 && !loading && (
-            <button
-              className="btn btn-primary"
-              onClick={handleCreateWallet}
-              disabled={loading}
-            >
-              Create Wallet
-            </button>
-          )}
-        </div>
+      <div className="loading-container">
+        <div className="spinner" />
+        <p>
+          {primaryEvm && primarySol
+            ? 'Redirecting with wallet addresses...'
+            : 'Creating wallets and redirecting...'}
+        </p>
+        {error && <div className="error-message" style={{ marginTop: '20px' }}>{error}</div>}
       </div>
     </div>
   );

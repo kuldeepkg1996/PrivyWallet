@@ -3,6 +3,20 @@ import { createRoot } from 'react-dom/client'
 import { PrivyProvider } from '@privy-io/react-auth'
 import './index.css'
 import App from './App.jsx'
+import { mainnet, base, optimism, polygon, arbitrum, bsc, baseSepolia } from 'viem/chains';
+
+const unichain = {
+  id: 1301,
+  name: 'Unichain',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://sepolia.unichain.org'] },
+    public: { http: ['https://sepolia.unichain.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Uniscan', url: 'https://sepolia.uniscan.xyz' },
+  },
+};
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -14,10 +28,7 @@ createRoot(document.getElementById('root')).render(
           accentColor: '#6366f1',
         },
         loginMethods: ['passkey'],
-        embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
-          requireUserPasswordOnCreate: false,
-        },
+        supportedChains: [mainnet,base, optimism, polygon, arbitrum, bsc, unichain,baseSepolia],
       }}
     >
       <App />
