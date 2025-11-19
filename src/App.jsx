@@ -12,7 +12,6 @@ import './App.css';
 function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [walletAddress, setWalletAddress] = useState('');
 
   const { authenticated, logout, ready: privyReady } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
@@ -48,44 +47,44 @@ function App() {
   // Extract wallet address when wallets are ready
   useEffect(() => {
     const sendWalletToNative = (address) => {
-      setWalletAddress(address);
+      // Clear any errors before redirecting
+      setError('');
+      
+      // Redirect immediately without delay
+      console.log('Redirecting to mobile app with address:', address);
 
-      const delayMs = 5000; // wait 3 seconds before redirect/post
+      // 1) Main path for InAppBrowser: deep link
+      try {
+        console.log('Redirecting to deep link with address:', address);
+        // orbitxpay is your custom scheme. Make sure it matches native config.
+        window.location.href = `orbitxpay://walletscreen?address=${encodeURIComponent(
+          address,
+        )}`;
+      } catch (e) {
+        console.error('Failed to redirect to deep link:', e);
+      }
 
-      console.log(`Will redirect/post wallet address in ${delayMs}ms`, address);
-
-      setTimeout(() => {
-        // 1) Main path for InAppBrowser: deep link
-        try {
-          console.log('Redirecting to deep link with address:', address);
-          // orbitxpay is your custom scheme. Make sure it matches native config.
-          window.location.href = `orbitxpay://walletscreen?address=${encodeURIComponent(
-            address,
-          )}`;
-        } catch (e) {
-          console.error('Failed to redirect to deep link:', e);
+      // 2) Fallback: if running inside a React Native WebView
+      try {
+        if (window?.ReactNativeWebView) {
+          console.log('Posting wallet address to ReactNativeWebView');
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({
+              type: 'WALLET_ADDRESS',
+              address,
+            }),
+          );
         }
-
-        // 2) Fallback: if running inside a React Native WebView
-        try {
-          if (window?.ReactNativeWebView) {
-            console.log('Posting wallet address to ReactNativeWebView');
-            window.ReactNativeWebView.postMessage(
-              JSON.stringify({
-                type: 'WALLET_ADDRESS',
-                address,
-              }),
-            );
-          }
-        } catch (e) {
-          console.error('Failed to post to ReactNativeWebView:', e);
-        }
-      }, delayMs);
+      } catch (e) {
+        console.error('Failed to post to ReactNativeWebView:', e);
+      }
     };
 
     if (walletsReady && wallets.length > 0) {
       const address = wallets[0].address;
       console.log('Wallets ready, address:', address);
+      // Clear error before redirecting
+      setError('');
       sendWalletToNative(address);
     } else if (walletsReady && wallets.length === 0 && authenticated) {
       // User is authenticated but has no wallet, create one
@@ -151,7 +150,6 @@ function App() {
     setError('');
     try {
       await logout();
-      setWalletAddress('');
     } catch (err) {
       console.error('Logout error:', err);
       setError(err?.message || 'Logout failed');
@@ -289,41 +287,14 @@ function App() {
 
           {error && <div className="error-message">{error}</div>}
 
-          {walletAddress ? (
-            <div className="wallet-info">
-              <div className="wallet-address-section">
-                <label className="address-label">Wallet Address</label>
-                <div className="address-container">
-                  <code className="address-text">{walletAddress}</code>
-                  <button
-                    className="btn-copy"
-                    onClick={() => copyToClipboard(walletAddress)}
-                    title="Copy address"
-                  >
-                    📋
-                  </button>
-                </div>
-              </div>
-
-              <div className="wallet-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Status</span>
-                  <span className="stat-value success">Active</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Network</span>
-                  <span className="stat-value">Ethereum</span>
-                </div>
-              </div>
-            </div>
-          ) : (
+          {wallets.length === 0 && (
             <div className="no-wallet">
               <p>No wallet found. Creating one for you...</p>
               {loading && <div className="spinner-small" />}
             </div>
           )}
 
-          {!walletAddress && !loading && (
+          {wallets.length === 0 && !loading && (
             <button
               className="btn btn-primary"
               onClick={handleCreateWallet}
