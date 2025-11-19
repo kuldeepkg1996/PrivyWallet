@@ -131,6 +131,36 @@
   word-break: break-all;
 }
 
+.login-subtitle {
+  color: #d3d3d3;
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.btn-cancel-link {
+  display: block;
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.btn-cancel-link:hover:not(:disabled) {
+  color: #EFB89E;
+}
+
+.btn-cancel-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 600px) {
   .sign-tx-card {
     padding: 30px 20px;
