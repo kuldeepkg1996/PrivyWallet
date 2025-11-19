@@ -180,13 +180,13 @@ function App() {
     return () => clearTimeout(timer);
   }, [walletsReady, privyReady]);
 
-  // Show loading if Privy or wallets aren't ready
+  // Show loading if system or wallets aren't ready
   if ((!walletsReady || !privyReady) && !initTimeout) {
     return (
       <div className="app-container">
         <div className="loading-container">
           <div className="spinner" />
-          <p>Initializing Privy...</p>
+          <p>Initializing wallet system...</p>
           <p
             style={{
               fontSize: '0.875rem',
@@ -194,7 +194,7 @@ function App() {
               opacity: 0.8,
             }}
           >
-            Privy Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
+            System Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
             {walletsReady ? 'Yes' : 'No'}
           </p>
         </div>
@@ -209,16 +209,16 @@ function App() {
           <div className="auth-card">
             <h1 className="app-title">⚠️ Initialization Error</h1>
             <p className="app-subtitle">
-              Privy is taking longer than expected to initialize.
+              The system is taking longer than expected to initialize.
             </p>
             <p className="info-text">
-              Please refresh the page or check your Privy App ID configuration.
+              Please refresh the page or check your configuration.
             </p>
             <p
               className="info-text"
               style={{ fontSize: '0.75rem', marginTop: '10px' }}
             >
-              Privy Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
+              System Ready: {privyReady ? 'Yes' : 'No'} | Wallets Ready:{' '}
               {walletsReady ? 'Yes' : 'No'}
             </p>
             <button
@@ -239,9 +239,9 @@ function App() {
       <div className="app-container">
         <div className="auth-container">
           <div className="auth-card">
-            <h1 className="app-title">🔐 Privy Wallet</h1>
+            <h1 className="app-title">🔐 Create Your Self-Custodial Wallet</h1>
             <p className="app-subtitle">
-              Secure Web3 Authentication with Passkeys
+              Secure Web3 Authentication with Passkeys and generate your self-custodial wallet
             </p>
             {error && <div className="error-message">{error}</div>}
             <div className="auth-buttons">
