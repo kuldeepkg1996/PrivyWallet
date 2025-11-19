@@ -1,8 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { PrivyProvider } from '@privy-io/react-auth'
 import './index.css'
 import App from './App.jsx'
+import SignTransaction from './SignTransaction.jsx'
 import { mainnet, base, optimism, polygon, arbitrum, bsc, baseSepolia } from 'viem/chains'
 
 // Your custom chain
@@ -56,7 +58,12 @@ createRoot(rootElement).render(
         // },
       }}
     >
-      <App />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/signTransaction" element={<SignTransaction />} />
+        </Routes>
+      </BrowserRouter>
     </PrivyProvider>
   </StrictMode>
 );
