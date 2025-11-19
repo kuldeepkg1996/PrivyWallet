@@ -1,4 +1,3 @@
-// App.jsx
 import { useState, useEffect } from 'react';
 import {
   usePrivy,
@@ -21,29 +20,18 @@ function App() {
   const [initTimeout, setInitTimeout] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
 
-  const { authenticated, logout, ready: privyReady } = usePrivy();
+  const { authenticated, ready: privyReady } = usePrivy();
 
   // EVM wallets
-  const {
-    wallets: evmWallets,
-    ready: evmWalletsReady,
-  } = useEvmWallets();
-
+  const { wallets: evmWallets, ready: evmWalletsReady } = useEvmWallets();
   const { createWallet: createEvmWallet } = useCreateEvmWallet();
 
   // Solana wallets
-  const {
-    wallets: solanaWallets,
-    ready: solanaWalletsReady,
-  } = useSolanaWallets();
-
+  const { wallets: solanaWallets, ready: solanaWalletsReady } = useSolanaWallets();
   const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
 
   const allWalletsReady = evmWalletsReady && solanaWalletsReady;
 
-  /**
-   * Send both EVM + Solana addresses to native (deep link + WebView fallback)
-   */
   const sendWalletsToNative = (evmAddress, solanaAddress) => {
     if (hasRedirected) return;
 
@@ -52,7 +40,6 @@ function App() {
 
     console.log('🌉 Sending wallets to native:', { evmAddress, solanaAddress });
 
-    // Deep link with simple query params
     try {
       const url =
         `orbitxpay://walletscreen` +
@@ -65,14 +52,12 @@ function App() {
       console.error('Failed to redirect to deep link:', e);
     }
 
-    // Fallback for ReactNative WebView
     try {
       if (window.ReactNativeWebView) {
-        console.log('Posting wallet addresses to ReactNativeWebView');
         window.ReactNativeWebView.postMessage(
           JSON.stringify({
             type: 'WALLET_ADDRESS',
-            address: evmAddress, // legacy
+            address: evmAddress,
             evmAddress,
             solanaAddress,
           }),
@@ -84,9 +69,8 @@ function App() {
   };
 
   const { signupWithPasskey } = useSignupWithPasskey({
-    onComplete: async (user) => {
-      console.log('User signed up:', user);
-      // After signup, wallets will be ensured in the effect below
+    onComplete: () => {
+      console.log('User signed up – wallets will be ensured in effect.');
     },
     onError: (error) => {
       console.error('Signup failed:', error);
@@ -95,8 +79,8 @@ function App() {
   });
 
   const { loginWithPasskey } = useLoginWithPasskey({
-    onComplete: (user) => {
-      console.log('User logged in:', user);
+    onComplete: () => {
+      console.log('User logged in');
     },
     onError: (error) => {
       console.error('Login failed:', error);
@@ -104,63 +88,64 @@ function App() {
     },
   });
 
-  /**
-   * Ensure both EVM + Solana wallets exist, then send to native once.
-   */
+  // ✅ Ensure both EVM + Solana wallets exist, then send to native
   useEffect(() => {
     if (!authenticated) return;
     if (!allWalletsReady) return;
     if (hasRedirected) return;
     if (loading) return;
 
-   const ensureWalletsAndSend = async () => {
-  setLoading(true);
-  setError('');
+    const ensureWalletsAndSend = async () => {
+      setLoading(true);
+      setError('');
 
-  try {
-    console.log('🔎 EVM wallets from hook:', evmWallets);
-    console.log('🔎 Solana wallets from hook:', solanaWallets);
+      try {
+        console.log('🔎 EVM wallets from hook:', evmWallets);
+        console.log('🔎 Solana wallets from hook:', solanaWallets);
 
-    let evmWallet = evmWallets[0];
-    let solWallet = solanaWallets[0];
+        let evmWallet = evmWallets[0];
+        let solWallet = solanaWallets[0];
 
-    if (!evmWallet) {
-      console.log('No EVM wallet found. Creating EVM wallet...');
-      const createdEvm = await createEvmWallet();
-      console.log('✅ createEvmWallet result:', createdEvm);
-      evmWallet = createdEvm || evmWallets[0];
-    }
+        // EVM
+        if (!evmWallet) {
+          console.log('No EVM wallet found. Creating EVM wallet...');
+          const createdEvm = await createEvmWallet();
+          console.log('✅ createEvmWallet result:', createdEvm);
+          // support both direct wallet or {wallet}
+          evmWallet = createdEvm?.wallet || createdEvm || evmWallets[0];
+        }
 
-    if (!solWallet) {
-      console.log('No Solana wallet found. Creating Solana wallet...');
-      const createdSol = await createSolanaWallet();
-      console.log('✅ createSolanaWallet result:', createdSol);
-      console.log('🔎 Solana wallets from hook AFTER create:', solanaWallets);
-      solWallet = createdSol || solanaWallets[0];
-    }
+        // Solana
+        if (!solWallet) {
+          console.log('No Solana wallet found. Creating Solana wallet...');
+          const createdSol = await createSolanaWallet({ createAdditional: false });
+          console.log('✅ createSolanaWallet result:', createdSol);
+          console.log('🔎 Solana wallets from hook AFTER create:', solanaWallets);
+          // support both direct wallet or {wallet}
+          solWallet = createdSol?.wallet || createdSol || solanaWallets[0];
+        }
 
-    console.log('Final EVM wallet object:', evmWallet);
-    console.log('Final Solana wallet object:', solWallet);
+        console.log('Final EVM wallet object:', evmWallet);
+        console.log('Final Solana wallet object:', solWallet);
 
-    const evmAddress = evmWallet?.address || '';
-    const solanaAddress = solWallet?.address || '';
+        const evmAddress = evmWallet?.address || '';
+        const solanaAddress = solWallet?.address || '';
 
-    console.log('📍 EVM address =', evmAddress);
-    console.log('📍 Solana address =', solanaAddress);
+        console.log('📍 EVM address =', evmAddress);
+        console.log('📍 Solana address =', solanaAddress);
 
-    if (!evmAddress && !solanaAddress) {
-      throw new Error('No wallet addresses found even after creation');
-    }
+        if (!evmAddress && !solanaAddress) {
+          throw new Error('No wallet addresses found even after creation');
+        }
 
-    sendWalletsToNative(evmAddress, solanaAddress);
-  } catch (err) {
-    console.error('❌ Error ensuring wallets:', err);
-    setError(err?.message || 'Failed to create wallet(s)');
-  } finally {
-    setLoading(false);
-  }
-};
-
+        sendWalletsToNative(evmAddress, solanaAddress);
+      } catch (err) {
+        console.error('❌ Error ensuring wallets:', err);
+        setError(err?.message || 'Failed to create wallet(s)');
+      } finally {
+        setLoading(false);
+      }
+    };
 
     ensureWalletsAndSend();
     // eslint-disable-next-line react-hooks/exhaustive-deps
