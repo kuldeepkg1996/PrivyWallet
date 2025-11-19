@@ -276,13 +276,13 @@ function App() {
         <div className="wallet-card">
           <div className="wallet-header">
             <h1 className="wallet-title">✨ Your Wallet</h1>
-            <button
+            {/* <button
               className="btn-logout"
               onClick={handleLogout}
               disabled={loading}
             >
               Logout
-            </button>
+            </button> */}
           </div>
 
           {error && <div className="error-message">{error}</div>}
