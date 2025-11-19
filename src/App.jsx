@@ -111,11 +111,13 @@ function App() {
 
     // 1) Main path for InAppBrowser: deep link with both addresses
     try {
-      const encodedPayload = encodeURIComponent(JSON.stringify(payload));
-      const url = `orbitxpay://walletscreen?payload=${encodedPayload}`;
-      console.log('Redirecting to deep link:', url);
-      window.location.href = url;
-    } catch (e) {
+    const url = `orbitxpay://walletscreen?` +
+      `evmAddress=${encodeURIComponent(evmAddress || '')}` +
+      `&solanaAddress=${encodeURIComponent(solanaAddress || '')}`;
+
+    console.log('Redirecting to deep link:', url);
+    window.location.href = url;
+  }  catch (e) {
       console.error('Failed to redirect to deep link:', e);
     }
 
