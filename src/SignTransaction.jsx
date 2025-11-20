@@ -25,8 +25,9 @@ function SignTransaction() {
   const [txHash, setTxHash] = useState('');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [switchingNetwork, setSwitchingNetwork] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Extract parameters from URL query
+  // query params
   const network = searchParams.get('network') || 'ethereum';
   const tokenSymbol = searchParams.get('tokenSymbol') || '';
   const tokenAddress = searchParams.get('tokenAddress') || '';
@@ -86,6 +87,7 @@ function SignTransaction() {
     setError('');
     setSuccess('');
     setTxHash('');
+    setShowSuccessModal(false);
 
     try {
       if (network.toLowerCase().includes('solana')) {
@@ -107,20 +109,11 @@ function SignTransaction() {
       throw new Error('No EVM wallet found');
     }
 
-    if (!recipientAddress) {
-      throw new Error('Recipient address is required');
-    }
+    if (!recipientAddress) throw new Error('Recipient address is required');
+    if (!amount) throw new Error('Amount is required');
 
-    if (!amount) {
-      throw new Error('Amount is required');
-    }
-
-    // Switch to the correct network if chainId is provided
     const targetChainId = parseInt(chainId, 10);
     if (chainId && targetChainId) {
-      console.log(`Target chain ID: ${targetChainId}`);
-      
-      // Check if we need to switch networks
       const currentChainId = selectedWallet.chainId;
       if (currentChainId && currentChainId !== targetChainId) {
         console.log(`Current chain: ${currentChainId}, switching to: ${targetChainId}`);
@@ -130,41 +123,30 @@ function SignTransaction() {
 
     let txRequest = {};
 
-    // If token address is provided, it's an ERC20 transfer
+    // ERC-20 transfer
     if (tokenAddress && tokenAddress !== '') {
       console.log('Preparing ERC-20 token transfer...');
-      
-      // Convert amount based on token decimals
       const decimals = parseInt(tokenDecimals, 10);
-      const amountInSmallestUnit = BigInt(Math.floor(parseFloat(amount) * Math.pow(10, decimals)));
-      
-      console.log(`Amount: ${amount} ${tokenSymbol}`);
-      console.log(`Decimals: ${decimals}`);
-      console.log(`Amount in smallest unit: ${amountInSmallestUnit.toString()}`);
-      
-      // Encode the transfer function call using viem
+      const amountInSmallestUnit = BigInt(
+        Math.floor(parseFloat(amount) * Math.pow(10, decimals)),
+      );
+
       const encodedData = encodeFunctionData({
         abi: erc20Abi,
         functionName: 'transfer',
         args: [recipientAddress, amountInSmallestUnit],
       });
-      
+
       txRequest = {
-        to: tokenAddress, // Send to token contract
+        to: tokenAddress,
         data: encodedData,
         chainId: targetChainId,
       };
-      
-      console.log('ERC-20 Transfer Data:', encodedData);
     } else {
-      // Native token transfer (ETH, BNB, etc.)
+      // Native transfer
       console.log('Preparing native token transfer...');
-      
       const valueInWei = parseEther(amount);
-      
-      console.log(`Amount: ${amount} ETH`);
-      console.log(`Value in Wei: ${valueInWei.toString()}`);
-      
+
       txRequest = {
         to: recipientAddress,
         value: valueInWei,
@@ -172,26 +154,27 @@ function SignTransaction() {
       };
     }
 
-    // Add gas price/fee if provided
+    // optional gas
     if (fee && fee !== '') {
-      const gasPrice = BigInt(Math.floor(parseFloat(fee) * 1e9)); // Convert to Gwei
+      const gasPrice = BigInt(Math.floor(parseFloat(fee) * 1e9)); // Gwei -> wei
       txRequest.gasPrice = gasPrice;
-      console.log(`Gas Price: ${fee} Gwei`);
     }
 
     console.log('Sending transaction:', txRequest);
 
-    // Use Privy's sendTransaction hook
     const result = await sendTransaction(txRequest, {
       address: selectedWallet.address,
     });
 
-    const hash = typeof result === 'string' ? result : result.transactionHash || result.hash;
-    
+    const hash =
+      typeof result === 'string'
+        ? result
+        : result.transactionHash || result.hash;
+
     console.log('Transaction result:', hash);
     setTxHash(hash);
     setSuccess('Transaction sent successfully!');
-    sendResultToNative(hash, 'success');
+    setShowSuccessModal(true); // ⬅️ show modal instead of immediately deep-linking
   };
 
   const handleSolanaTransaction = async () => {
@@ -199,19 +182,18 @@ function SignTransaction() {
     if (!wallet) {
       throw new Error('No Solana wallet found');
     }
+    if (!recipientAddress) throw new Error('Recipient address is required');
 
-    if (!recipientAddress) {
-      throw new Error('Recipient address is required');
-    }
-
-    // For Solana, you'd need to construct the transaction
-    // This is a simplified example - you'll need @solana/web3.js for full implementation
+    // TODO: implement actual Solana tx
     throw new Error('Solana transaction signing coming soon - needs @solana/web3.js integration');
   };
 
   const sendResultToNative = (hash, status) => {
     try {
-      const url = `orbitxpay://transaction?hash=${encodeURIComponent(hash)}&status=${status}`;
+      const url = `orbitxpay://transaction?hash=${encodeURIComponent(
+        hash || '',
+      )}&status=${status}`;
+      // Deep link for native app
       window.location.href = url;
     } catch (e) {
       console.error('Failed to redirect:', e);
@@ -225,7 +207,7 @@ function SignTransaction() {
             hash,
             status,
             network,
-          })
+          }),
         );
       }
     } catch (e) {
@@ -238,12 +220,15 @@ function SignTransaction() {
     navigate('/');
   };
 
-  // Determine if it's a token transfer
+  const handleGoHome = () => {
+    // Called from success modal button
+    sendResultToNative(txHash, 'success');
+    navigate('/'); // in browser it goes back to root, in app deep-link will take user to home
+  };
+
   const isTokenTransfer = tokenAddress && tokenAddress !== '';
-  const displayNetwork = network || 'Ethereum';
   const displayTokenSymbol = tokenSymbol || 'Tokens';
-  
-  // Get chain name from chainId
+
   const getChainName = (id) => {
     const chains = {
       '1': 'Ethereum Mainnet',
@@ -282,6 +267,11 @@ function SignTransaction() {
     }
   };
 
+  const shortenHash = (hash) => {
+    if (!hash) return '';
+    return `${hash.slice(0, 6)}....${hash.slice(-4)}`;
+  };
+
   if (!ready) {
     return (
       <div className="sign-tx-container">
@@ -293,7 +283,6 @@ function SignTransaction() {
     );
   }
 
-  // Show login prompt if not authenticated
   if (showLoginPrompt && !authenticated) {
     return (
       <div className="sign-tx-container">
@@ -306,12 +295,16 @@ function SignTransaction() {
           <div className="tx-details">
             <div className="detail-row">
               <span className="detail-label">Network:</span>
-              <span className="detail-value chain-badge">{getChainName(chainId)}</span>
+              <span className="detail-value chain-badge">
+                {getChainName(chainId)}
+              </span>
             </div>
             {recipientAddress && (
               <div className="detail-row">
                 <span className="detail-label">Recipient:</span>
-                <span className="detail-value address-text">{recipientAddress}</span>
+                <span className="detail-value address-text">
+                  {recipientAddress}
+                </span>
               </div>
             )}
             {amount && (
@@ -359,17 +352,21 @@ function SignTransaction() {
     <div className="sign-tx-container">
       <div className="sign-tx-card">
         <h1 className="sign-tx-title">🔐 Sign Transaction</h1>
-        
+
         <div className="tx-details">
           <div className="detail-row">
             <span className="detail-label">Network:</span>
-            <span className="detail-value chain-badge">{getChainName(chainId)}</span>
+            <span className="detail-value chain-badge">
+              {getChainName(chainId)}
+            </span>
           </div>
 
           {recipientAddress && (
             <div className="detail-row">
               <span className="detail-label">Recipient:</span>
-              <span className="detail-value address-text">{recipientAddress}</span>
+              <span className="detail-value address-text">
+                {recipientAddress}
+              </span>
             </div>
           )}
 
@@ -385,7 +382,9 @@ function SignTransaction() {
           {isTokenTransfer && (
             <div className="detail-row">
               <span className="detail-label">Token Contract:</span>
-              <span className="detail-value address-text">{tokenAddress}</span>
+              <span className="detail-value address-text">
+                {tokenAddress}
+              </span>
             </div>
           )}
 
@@ -406,20 +405,24 @@ function SignTransaction() {
           {!network.toLowerCase().includes('solana') && evmWallets[0] && (
             <div className="detail-row">
               <span className="detail-label">From:</span>
-              <span className="detail-value address-text">{evmWallets[0].address}</span>
+              <span className="detail-value address-text">
+                {evmWallets[0].address}
+              </span>
             </div>
           )}
 
           {network.toLowerCase().includes('solana') && solanaWallets[0] && (
             <div className="detail-row">
               <span className="detail-label">From:</span>
-              <span className="detail-value address-text">{solanaWallets[0].address}</span>
+              <span className="detail-value address-text">
+                {solanaWallets[0].address}
+              </span>
             </div>
           )}
         </div>
 
         {error && <div className="error-message">{error}</div>}
-        {success && (
+        {success && !showSuccessModal && (
           <div className="success-message">
             {success}
             {txHash && (
@@ -437,7 +440,11 @@ function SignTransaction() {
             onClick={handleSignAndSend}
             disabled={loading || switchingNetwork || !recipientAddress || !amount}
           >
-            {switchingNetwork ? 'Switching Network...' : loading ? 'Signing...' : 'Sign & Send'}
+            {switchingNetwork
+              ? 'Switching Network...'
+              : loading
+              ? 'Signing...'
+              : 'Sign & Send'}
           </button>
           <button
             className="btn btn-secondary"
@@ -448,6 +455,39 @@ function SignTransaction() {
           </button>
         </div>
       </div>
+
+      {/* SUCCESS MODAL */}
+      {showSuccessModal && (
+        <div className="success-modal-overlay">
+          <div className="success-modal-card">
+            <div className="success-modal-circle-outer">
+              <div className="success-modal-circle-inner">
+                <span className="success-checkmark">✓</span>
+              </div>
+            </div>
+
+            <h2 className="success-modal-title">Withdrawal Completed</h2>
+            <p className="success-modal-subtitle">
+              Your transaction has been completed.
+            </p>
+
+            {txHash && (
+              <div className="success-modal-hash-row">
+                <span className="success-modal-hash-label">
+                  Transaction Hash
+                </span>
+                <span className="success-modal-hash-value">
+                  {shortenHash(txHash)}
+                </span>
+              </div>
+            )}
+
+            <button className="success-modal-primary-btn" onClick={handleGoHome}>
+              Go to Home
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
