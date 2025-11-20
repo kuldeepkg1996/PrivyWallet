@@ -5,7 +5,12 @@ import { PrivyProvider } from '@privy-io/react-auth'
 import './index.css'
 import App from './App.jsx'
 import SignTransaction from './SignTransaction.jsx'
+import Profile from './Profile.jsx'
 import { mainnet, base, optimism, polygon, arbitrum, bsc, baseSepolia } from 'viem/chains'
+import { Buffer } from 'buffer';
+
+window.Buffer = Buffer;
+
 
 // Your custom chain
 const unichain = {
@@ -62,6 +67,7 @@ createRoot(rootElement).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/signTransaction" element={<SignTransaction />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </BrowserRouter>
     </PrivyProvider>
