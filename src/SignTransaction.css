@@ -282,3 +282,18 @@
     flex-direction: column;
   }
 }
+
+.message-box {
+  width: 100%;
+  background: #1a1a1a;
+  border: 2px solid #EFB89E;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+  color: #ffffff !important;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-weight: 500;
+}

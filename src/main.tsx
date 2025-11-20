@@ -3,13 +3,16 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { PrivyProvider } from '@privy-io/react-auth'
 import './index.css'
-import App from './App.jsx'
-import SignTransaction from './SignTransaction.jsx'
-import Profile from './Profile.jsx'
+import App from './App'
+import SignTransaction from './SignTransaction'
+import SolanaSignTransaction from './SolanaSignTransaction'
+import EvmSignMessage from './EvmSignMessage'
+import SolanaSignMessage from './SolanaSignMessage'
+import Profile from './Profile'
 import { mainnet, base, optimism, polygon, arbitrum, bsc, baseSepolia } from 'viem/chains'
 import { Buffer } from 'buffer';
 
-window.Buffer = Buffer;
+(window as any).Buffer = Buffer;
 
 
 // Your custom chain
@@ -52,21 +55,19 @@ createRoot(rootElement).render(
           },
         },
 
-        // Optional but recommended if you plan to sign/send SOL tx via Privy UIs
-        // solana: {
-        //   rpcs: {
-        //     'solana:devnet': {
-        //       rpc: createSolanaRpc('https://api.devnet.solana.com'),
-        //       rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.devnet.solana.com'),
-        //     },
-        //   },
-        // },
+        // ✅ Configure Solana RPC endpoint (default for embedded wallets)
+        solana: {
+          rpcEndpoint: 'https://api.devnet.solana.com',
+        },
       }}
     >
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/signTransaction" element={<SignTransaction />} />
+          <Route path="/evm/signMessage" element={<EvmSignMessage />} />
+          <Route path="/solana/signTransaction" element={<SolanaSignTransaction />} />
+          <Route path="/solana/signMessage" element={<SolanaSignMessage />} />
           <Route path="/profile" element={<Profile />} />
         </Routes>
       </BrowserRouter>
