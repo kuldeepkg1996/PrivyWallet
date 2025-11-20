@@ -6,6 +6,8 @@ import './index.css'
 import App from './App.jsx'
 import SignTransaction from './SignTransaction.jsx'
 import { mainnet, base, optimism, polygon, arbitrum, bsc, baseSepolia } from 'viem/chains'
+import Buffer from 'buffer';
+window.Buffer = Buffer;
 
 // Your custom chain
 const unichain = {

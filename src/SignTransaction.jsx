@@ -11,6 +11,7 @@ import { useWallets as useSolanaWallets } from '@privy-io/react-auth/solana';
 import { encodeFunctionData, erc20Abi, parseEther } from 'viem';
 import './SignTransaction.css';
 
+
 function SignTransaction() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
